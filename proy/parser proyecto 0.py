@@ -164,4 +164,4 @@ if __name__ == "__main__":
         parser.parse()
         print("¡Sintaxis correcta!")
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"{e}")
