@@ -32,6 +32,7 @@ class Parser:
         """Procesa el input y valida la sintaxis."""
         while self.index < len(self.words):
             word = self.next_word()
+            print(word)
             if word.isdigit():
                 continue  # Ignorar números de línea
             elif word == "|":
@@ -66,6 +67,7 @@ class Parser:
         self.match("[")
         self.parse_block()
         self.match("]")
+        self.index += 1
 
     def parse_main_block(self):
         """Procesa el bloque principal fuera de los procedimientos."""
@@ -84,7 +86,6 @@ class Parser:
 
     def parse_statement(self, word):
         """Procesa una sentencia dentro de un procedimiento o bloque."""
-        print(word)
         if word in self.variables:
             self.match(":")
             self.next_word()  # Valor de la asignación
@@ -98,24 +99,23 @@ class Parser:
             llave = list(self.procedures)[0]
             lista_param = self.procedures[llave]
             for i in range(len(lista_param)):
+                self.match(":")
+                self.index += 1
+                param_value = self.next_word()
+                if not param_value.isdigit() and not param_value in self.variables:
+                    raise Exception(f"Error: Parámetro inválido '{param_value}' en la llamada a '{word}'.")
+                self.match("oftype")
+                self.next_word()
+                self.match(":")
+                self.index += 1
+                tipo = self.next_word()
+                if tipo != "#chips" and tipo !=  "#balloons":
+                    raise Exception(f"Error: tipo de objeto equivocado")
                 if i == 0:
-                    self.match(":")
+                    self.match(".")
                     self.index += 1
-                    param_value = self.next_word()
-                    if not param_value.isdigit() and not param_value in self.variables:
-                        raise Exception(f"Error: Parámetro inválido '{param_value}' en la llamada a '{word}'.")
-                    self.match("oftype")
-                    self.next_word()
-                    self.match(":")
+                    self.match(word)
                     self.index += 1
-                    tipo = self.next_word()
-                    if tipo != "#chips" and tipo !=  "#balloons":
-                        raise Exception(f"Error: tipo de objeto equivocado")
-                    if i == 0:
-                        self.match(".")
-                        self.index += 1
-                        self.match(word)
-                        self.index += 1
         elif word in ["if:", "while:", "repeat:"]:
             self.parse_control_structure(word)
         elif word in ["move:", "turn:", "face:", "put:", "pick:", "goto:", "jump:", "nop"]:
