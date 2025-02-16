@@ -12,7 +12,7 @@ class Parser:
             input_text = input_text.replace(symbol, f" {symbol} ")
         self.words = input_text.lower().split()
         self.index = 0
-        self.variables = set()
+        self.variables = []
         self.procedures = {}
 
     def next_word(self):
@@ -45,13 +45,12 @@ class Parser:
 
     def parse_declaracion_variables(self):
         """Procesa la declaración de variables globales o locales."""
-        local_variables = set()
         while self.index < len(self.words):
             word = self.next_word()
             if word == "|":
                 break
-            local_variables.add(word)
-        self.variables.update(local_variables)
+            if word != ",":
+                self.variables.append(word)
 
     def parse_procedimiento(self):
         """Procesa la declaración de procedimientos."""
@@ -87,19 +86,36 @@ class Parser:
         """Procesa una sentencia dentro de un procedimiento o bloque."""
         print(word)
         if word in self.variables:
-            self.match(":=")
+            self.match(":")
             self.next_word()  # Valor de la asignación
+            self.match("=")
+            self.next_word()
+            self.next_word()
             self.match(".")
-        elif word in self.procedures:
+            self.next_word()
+        elif word in list(self.procedures)[0]:
             # Validar argumentos
-            expected_params = self.procedures[word]
-            for _ in range(len(expected_params)):
-                param_value = self.next_word()
-                if param_value.isdigit() or param_value in self.variables:
-                    continue
-                else:
-                    raise Exception(f"Error: Parámetro inválido '{param_value}' en la llamada a '{word}'.")
-            self.match(".")
+            llave = list(self.procedures)[0]
+            lista_param = self.procedures[llave]
+            for i in range(len(lista_param)):
+                if i == 0:
+                    self.match(":")
+                    self.index += 1
+                    param_value = self.next_word()
+                    if not param_value.isdigit() and not param_value in self.variables:
+                        raise Exception(f"Error: Parámetro inválido '{param_value}' en la llamada a '{word}'.")
+                    self.match("oftype")
+                    self.next_word()
+                    self.match(":")
+                    self.index += 1
+                    tipo = self.next_word()
+                    if tipo != "#chips" and tipo !=  "#balloons":
+                        raise Exception(f"Error: tipo de objeto equivocado")
+                    if i == 0:
+                        self.match(".")
+                        self.index += 1
+                        self.match(word)
+                        self.index += 1
         elif word in ["if:", "while:", "repeat:"]:
             self.parse_control_structure(word)
         elif word in ["move:", "turn:", "face:", "put:", "pick:", "goto:", "jump:", "nop"]:
