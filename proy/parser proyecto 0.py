@@ -32,7 +32,6 @@ class Parser:
         """Procesa el input y valida la sintaxis."""
         while self.index < len(self.words):
             word = self.next_word()
-            print(word)
             if word.isdigit():
                 continue  # Ignorar números de línea
             elif word == "|":
@@ -116,7 +115,7 @@ class Parser:
                     self.index += 1
                     self.match(word)
                     self.index += 1
-        elif word in ["if:", "while:", "repeat:"]:
+        elif word in ["if", "while", "repeat"]:
             self.parse_control_structure(word)
         elif word in ["move:", "turn:", "face:", "put:", "pick:", "goto:", "jump:", "nop"]:
             self.parse_robot_command(word)
@@ -127,6 +126,8 @@ class Parser:
 
     def parse_control_structure(self, keyword):
         """Procesa estructuras de control como if, while, repeat."""
+        self.match(":")
+        self.index += 1
         self.next_word()  # Leer la condición o el número de repeticiones
         if keyword == "if:":
             self.match("then:")
