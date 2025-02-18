@@ -6,7 +6,6 @@ class Parser:
                 input_text = file.read()
         except FileNotFoundError:
             raise Exception(f"Error: No se pudo abrir el archivo '{file_path}'.")
-
         # Espaciamos los símbolos clave para facilitar el parsing
         for symbol in ["[", "]", ".", "|", ","]:
             input_text = input_text.replace(symbol, f" {symbol} ")
