@@ -11,6 +11,10 @@ class Parser:
         for symbol in ["[", "]", ".", "|", ","]:
             input_text = input_text.replace(symbol, f" {symbol} ")
         self.words = input_text.lower().split()
+        veces = self.words.count(".")
+        for i in range(0, len(self.words)-veces):
+            if self.words[i] == ".":
+                self.words.pop(i)
         self.index = 0
         self.variables = []
         self.procedures = {}
@@ -40,6 +44,8 @@ class Parser:
                 self.parse_procedimiento()
             elif word == "[":
                 self.parse_main_block()
+            elif self.index == len(self.words):
+                break
             else:
                 raise Exception(f"Error: palabra inesperada '{word}'.")
 
@@ -61,6 +67,9 @@ class Parser:
                 if not valor in dict2[word]:
                     raise Exception(f"Error: Argumento inválido '{valor}' en el comando '{word}'.")
                 break
+            elif word == "nop":
+                self.index += 1
+                break
             valor = self.next_word()
             if not valor.isdigit() and not valor in self.variables:
                 raise Exception(f"Error: Parámetro inválido '{valor}' en la llamada a '{word}'.")
@@ -68,7 +77,10 @@ class Parser:
             if valor1 not in dict1[word]:
                 raise Exception(f"Error: Argumento inválido '{valor1}' en el comando '{word}'.")
             valor2 = self.next_word()
-            if valor2 == "." or valor2 == "]":
+            if valor2 in dict2:
+                self.index -= 1
+                break
+            elif valor2 == "]":
                 break
             if word in ["jump:", "move:"]:
                 if valor1 == dict1[word][0]:
@@ -83,7 +95,9 @@ class Parser:
             else: 
                 if valor2 not in dict2[word]:
                     raise Exception(f"Error: Argumento inválido '{valor2}' en el comando '{word}'.")
-            self.index += 1
+            valor = self.next_word()
+            if valor != "]":
+                self.index -= 1
             break
         
     def parse_procedimiento(self):
@@ -103,7 +117,8 @@ class Parser:
 
     def parse_main_block(self):
         """Procesa el bloque principal fuera de los procedimientos."""
-        self.parse_block()
+        self.index -= 1
+        self.parse_block("a")
         self.match("]")
 
     def parse_block(self, nombre):
@@ -118,7 +133,7 @@ class Parser:
 
     def parse_statement(self, word, nombre):
         """Procesa una sentencia dentro de un procedimiento o bloque."""
-        dict1 = {"put:": "oftype:", "pick": "oftype:", "move:": ["tothe:", "indir:"], "jump:": ["tothe:", "indir:"], "goto": "with"}
+        dict1 = {"put:": "oftype:", "pick": "oftype:", "move:": ["tothe:", "indir:"], "jump:": ["tothe:", "indir:"], "goto:": "with:"}
         dict2 = {"put:": ["#balloons", "#chips"], "pick:": ["#balloons", "#chips"], "move:": ["#front", "#right", "#left", "#back"
                 ,"#north", "#south", "#west", "#east"], "jump:": ["#front", "#right", "#left", "#back", "#north", "#south", "#west", "#east"],
                 "turn:": ["#left", "#right", "#around"], "face:": ["#north", "#south", "#west", "#east"]
@@ -136,18 +151,30 @@ class Parser:
             lista_param = self.procedures[llave]
             if valor not in lista_param:
                 raise Exception(f"variable invalida") 
-            self.match(".")
-            self.next_word()
         elif word in ["move:", "turn:", "face:", "put:", "pick:", "goto:", "jump:", "nop"]:
             # Validar argumentos
-            if self.procedures[nombre] == []:
-                self.parse_robot_command(word, dict1, dict2)
-            else:
-                lista_param = self.procedures[nombre]
-                for i in range(0, len(lista_param)):
-                    if self.words[self.index] == word:
-                        self.index += 1
+            if nombre in self.procedures:
+                if self.procedures[nombre] == []:
                     self.parse_robot_command(word, dict1, dict2)
+                else:
+                    lista_param = self.procedures[nombre]
+                    for i in range(0, len(lista_param)):
+                        if self.words[self.index] == word:
+                            self.index += 1
+                        self.parse_robot_command(word, dict1, dict2)
+                    self.index -= 1
+            else:
+                self.parse_robot_command(word, dict1, dict2)
+        elif word in ["putchips:", "putballoons:", "pickchips:", "pickballoons:"]:
+            valor = self.next_word()
+            if not valor.isdigit():
+                raise Exception("no se reconoce el valor", valor)
+            self.index += 1
+            valor = self.next_word()
+            if not valor.isdigit():
+                raise Exception("no se reconoce el valor", valor)
+            valor = self.next_word()
+            if valor == "]":
                 self.index -= 1
         elif word in ["if:", "while:", "repeat:"]:
             self.parse_control_structure(word, dict1, dict2, dict3, dict4)
@@ -161,11 +188,9 @@ class Parser:
         if keyword == "while:":
             self.parse_robot_while(dict1, dict2, dict3, dict4)
         elif keyword == "if:":
-            self.match("then:")
-        elif keyword == "repeat:":
-            self.match("for:")
-            self.next_word()  # Número de repeticiones
-            self.match("repeat:")
+            self.parse_robot_if(dict1, dict2, dict3, dict4)
+        elif keyword == "for:":
+            self.parse_robot_repeat(dict1, dict2)
         self.match("]")
             
     def parse_robot_while(self, dict1, dict2, dict3, dict4):
@@ -178,8 +203,9 @@ class Parser:
                         raise Exception(f"Error: Argumento inválido '{valor}' en el comando '{word}'.")
                 self.index += 1
                 self.match("do")
-                self.index += 3
-                self.parse_robot_command("face", dict1, dict2)
+                self.index += 2
+                word1 = self.next_word()
+                self.parse_robot_command(word1, dict1, dict2)
                 break
             if word not in dict3:
                 raise Exception("condicional", word, "no reconocido")
@@ -203,8 +229,61 @@ class Parser:
             self.index += 3
             self.parse_robot_command(word[3:len(word)], dict1, dict2)
             break
+    def parse_robot_if(self, dict1, dict2, dict3, dict4):
+        while self.index < len(self.words):
+            word = self.next_word()
+            if word in ["facing:", "not:"]:
+                valor = self.next_word()
+                if word == "facing:":
+                    if not valor in dict4[word]:
+                        raise Exception(f"Error: Argumento inválido '{valor}' en el comando '{word}'.")
+                self.index += 1
+                self.match("then")
+                self.index += 2
+                word1 = self.next_word()
+                self.parse_robot_command(word1, dict1, dict2)
+                self.match("else:")
+                self.index += 2
+                word2 = self.next_word()
+                self.parse_robot_command(word2, dict1, dict2)
+            if word not in dict3:
+                raise Exception("condicional", word, "no reconocido")
+            valor = self.next_word()
+            if valor not in self.variables and not valor.isdigit():
+                raise Exception("valor", valor, "no reconocido")
+            valor1 = self.next_word()
+            if valor1 not in dict3[word]:
+                raise Exception("expresion", valor1, "no reconocido")
+            valor2 = self.next_word()
+            if word in ["canjump:", "canmove:"]:
+                if valor1 == dict3[word][0]:
+                    if not valor2 in dict4[word][0:4]:
+                        raise Exception(f"Error: Argumento inválido '{valor2}' en el comando '{word}'.")
+                elif valor1 == dict3[word][1]:
+                    if not valor2 in dict4[word][4:8]:
+                        raise Exception(f"Error: Argumento inválido '{valor2}' en el comando '{word}'.")
+            elif valor2 not in dict4[word]:
+                raise Exception("expresion", valor2, "no reconocido")
+            self.match("then:")
+            self.index += 3
+            self.parse_robot_command(word[3:len(word)], dict1, dict2)
+            self.match("else:")
+            self.index += 2
+            word2 = self.next_word()
+            self.parse_robot_command(word2, dict1, dict2)
+            break
         
-    
+    def parse_robot_repeat(self, dict1, dict2):
+         while self.index < len(self.words):
+            valor = self.next_word()
+            if valor not in self.variables and not valor.isdigit():
+                raise Exception("valor", valor, "no reconocido")
+            self.match("repeat:")
+            self.index += 2
+            word = self.next_word()
+            self.parse_robot_command(word, dict1, dict2)
+            break
+            
 if __name__ == "__main__":
     file_path = input("Ingrese el nombre del archivo de código: ")
     try:
@@ -213,3 +292,4 @@ if __name__ == "__main__":
         print("¡Sintaxis correcta!")
     except Exception as e:
         print(f"{e}")
+        
